@@ -1,4 +1,3 @@
-
 export interface Profile {
   id: string;
   firstName: string;
@@ -10,6 +9,9 @@ export interface Profile {
   photo?: string;
   status: 'active' | 'inactive';
   contactInfo?: string;
+  bloodGroup?: string;
+  contactNumber?: string;
+  monitoringEndTime?: string;
 }
 
 export interface VitalReading {

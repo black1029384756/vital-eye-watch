@@ -10,21 +10,22 @@ interface AdminProfileCardProps {
 }
 
 export function AdminProfileCard({ profile, isCompact }: AdminProfileCardProps) {
-  const { firstName, lastName, age, gender, location, status, macAddress, photo } = profile;
+  const { firstName, lastName, age, gender, location, status, macAddress, photo, bloodGroup, contactNumber } = profile;
   const fullName = `${firstName} ${lastName}`;
   const initials = getInitials(fullName);
   
   if (isCompact) {
     return (
-      <div className="flex items-center justify-between py-2">
+      <div className="flex items-center justify-between py-3">
         <div className="flex items-center space-x-3">
-          <Avatar className="h-10 w-10 border border-gray-200">
+          <Avatar className="h-12 w-12 border border-gray-200">
             <AvatarImage src={photo} alt={fullName} />
             <AvatarFallback>{initials}</AvatarFallback>
           </Avatar>
           <div>
             <h4 className="font-medium">{fullName}</h4>
             <p className="text-xs text-gray-500">{location}</p>
+            {bloodGroup && <p className="text-xs font-medium text-delphi-600">Blood: {bloodGroup}</p>}
           </div>
         </div>
         <Badge variant={status === "active" ? "default" : "secondary"} className="text-xs">
@@ -48,6 +49,7 @@ export function AdminProfileCard({ profile, isCompact }: AdminProfileCardProps) 
               {age} years • {gender}
             </p>
             <p className="text-gray-600 mt-1">{location}</p>
+            {bloodGroup && <p className="text-sm font-medium text-delphi-600 mt-1">Blood Group: {bloodGroup}</p>}
           </div>
         </div>
         <Badge variant={status === "active" ? "default" : "secondary"}>
@@ -64,6 +66,12 @@ export function AdminProfileCard({ profile, isCompact }: AdminProfileCardProps) 
           <h3 className="text-sm font-medium text-gray-500">Status</h3>
           <p>{status === "active" ? "Monitoring Active" : "Monitoring Inactive"}</p>
         </div>
+        {contactNumber && (
+          <div>
+            <h3 className="text-sm font-medium text-gray-500">Contact Number</h3>
+            <p className="font-medium">{contactNumber}</p>
+          </div>
+        )}
       </div>
     </div>
   );
