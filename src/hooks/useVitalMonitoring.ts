@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { Profile, VitalReading, AlertLevel } from '@/types/hostage';
 import { subscribeToVitalUpdates } from '@/services/mockApi';
@@ -20,57 +21,60 @@ export const useVitalMonitoring = ({
   initialVitals,
   enableAlerts = true
 }: UseVitalMonitoringProps): UseVitalMonitoringResult => {
-  // Initialize all state hooks at the top level to maintain consistent hook order
+  // Always declare all hooks at the top level with no conditions
   const [vitals, setVitals] = useState<VitalReading | null>(initialVitals || null);
   const [alertLevel, setAlertLevel] = useState<AlertLevel>(AlertLevel.NORMAL);
   const [isLoading, setIsLoading] = useState<boolean>(!initialVitals);
   
-  // Use refs for values we need to access in callbacks without adding them as dependencies
+  // Use refs for values that shouldn't trigger re-renders when they change
   const profileRef = useRef<Profile>(profile);
   const alertLevelRef = useRef<AlertLevel>(AlertLevel.NORMAL);
   const enableAlertsRef = useRef<boolean>(enableAlerts);
   
-  // Keep refs in sync with props
+  // Update refs when props change
   useEffect(() => {
     profileRef.current = profile;
-    enableAlertsRef.current = enableAlerts;
-  }, [profile, enableAlerts]);
+  }, [profile]);
   
-  // Keep alertLevelRef in sync with state
+  useEffect(() => {
+    enableAlertsRef.current = enableAlerts;
+  }, [enableAlerts]);
+  
+  // Update alertLevelRef when state changes
   useEffect(() => {
     alertLevelRef.current = alertLevel;
   }, [alertLevel]);
-
+  
   // Subscribe to vital updates
   useEffect(() => {
-    // Early return if profile isn't active - but don't make it conditional
-    if (!profile || profile.status !== 'active') {
+    // Always define this with no early returns that skip hook execution
+    let subscription = { unsubscribe: () => {} };
+    
+    if (profile && profile.status === 'active') {
+      setIsLoading(true);
+      
+      subscription = subscribeToVitalUpdates(profile.macAddress, (data) => {
+        setVitals(data);
+        setIsLoading(false);
+        
+        // Check alert level
+        const level = checkVitalSigns(data);
+        
+        // Only trigger alerts if the level has changed
+        if (level !== alertLevelRef.current) {
+          setAlertLevel(level);
+          
+          // Trigger alert if needed
+          if (enableAlertsRef.current && level !== AlertLevel.NORMAL) {
+            const profileName = `${profileRef.current.firstName} ${profileRef.current.lastName}`;
+            triggerAlert(data, profileName, level);
+          }
+        }
+      });
+    } else {
       setIsLoading(false);
-      return () => {/* Empty cleanup function */};
     }
     
-    setIsLoading(true);
-
-    // Subscribe to vital updates
-    const subscription = subscribeToVitalUpdates(profile.macAddress, (data) => {
-      setVitals(data);
-      setIsLoading(false);
-      
-      // Check alert level
-      const level = checkVitalSigns(data);
-      
-      // Only trigger alerts if the level has changed
-      if (level !== alertLevelRef.current) {
-        setAlertLevel(level);
-        
-        // Trigger alert if needed
-        if (enableAlertsRef.current && level !== AlertLevel.NORMAL) {
-          const profileName = `${profileRef.current.firstName} ${profileRef.current.lastName}`;
-          triggerAlert(data, profileName, level);
-        }
-      }
-    });
-
     // Cleanup subscription
     return () => {
       subscription.unsubscribe();
