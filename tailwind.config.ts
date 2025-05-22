@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,25 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				// Delphi TVS blue color theme
+				delphi: {
+					50: '#eef3ff',
+					100: '#e0e9ff',
+					200: '#c7d6fe',
+					300: '#a5b8fc',
+					400: '#8092f9',
+					500: '#0000FF', // Primary Delphi blue
+					600: '#3b4ef0',
+					700: '#2c3bd8',
+					800: '#2532ae',
+					900: '#252e89',
+					950: '#111b5a',
+				},
+				alert: {
+					normal: '#10b981', // Green for normal readings
+					warning: '#f59e0b', // Amber for borderline readings
+					danger: '#ef4444', // Red for abnormal readings
 				}
 			},
 			borderRadius: {
@@ -70,25 +90,22 @@ export default {
 			},
 			keyframes: {
 				'accordion-down': {
-					from: {
-						height: '0'
-					},
-					to: {
-						height: 'var(--radix-accordion-content-height)'
-					}
+					from: { height: '0' },
+					to: { height: 'var(--radix-accordion-content-height)' }
 				},
 				'accordion-up': {
-					from: {
-						height: 'var(--radix-accordion-content-height)'
-					},
-					to: {
-						height: '0'
-					}
+					from: { height: 'var(--radix-accordion-content-height)' },
+					to: { height: '0' }
+				},
+				'pulse-alert': {
+					'0%, 100%': { opacity: '1' },
+					'50%': { opacity: '0.5' }
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'pulse-alert': 'pulse-alert 1s ease-in-out infinite'
 			}
 		}
 	},
