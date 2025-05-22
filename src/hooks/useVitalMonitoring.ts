@@ -26,7 +26,7 @@ export const useVitalMonitoring = ({
   const [isLoading, setIsLoading] = useState<boolean>(!initialVitals);
 
   useEffect(() => {
-    if (profile.status !== 'active') {
+    if (!profile || profile.status !== 'active') {
       setIsLoading(false);
       return;
     }
@@ -40,11 +40,15 @@ export const useVitalMonitoring = ({
       
       // Check alert level
       const level = checkVitalSigns(data);
-      setAlertLevel(level);
       
-      // Trigger alert if needed
-      if (enableAlerts && level !== AlertLevel.NORMAL) {
-        triggerAlert(data, `${profile.firstName} ${profile.lastName}`, level);
+      // Only trigger alerts if the level has changed
+      if (level !== alertLevel) {
+        setAlertLevel(level);
+        
+        // Trigger alert if needed
+        if (enableAlerts && level !== AlertLevel.NORMAL) {
+          triggerAlert(data, `${profile.firstName} ${profile.lastName}`, level);
+        }
       }
     });
 
@@ -52,7 +56,7 @@ export const useVitalMonitoring = ({
     return () => {
       subscription.unsubscribe();
     };
-  }, [profile, enableAlerts]);
+  }, [profile, enableAlerts, alertLevel]);
 
   return {
     vitals,

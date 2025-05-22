@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { fetchAllProfilesWithVitals, createProfile, updateProfile, deleteProfile } from "@/services/mockApi";
@@ -6,7 +7,7 @@ import { AdminProfileCard } from "@/components/AdminProfileCard";
 import { VitalChart } from "@/components/VitalChart";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, UserX, Clock, Upload } from "lucide-react";
+import { Search, Plus, UserX, Clock, Upload, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,10 @@ import { useForm } from "react-hook-form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/components/ui/use-toast";
 import { generateMacAddress } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { AlertLevel } from "@/types/hostage";
+import { useVitalMonitoring } from "@/hooks/useVitalMonitoring";
 
 const Admin = () => {
   const [profiles, setProfiles] = useState<ProfileWithVitals[]>([]);
@@ -28,6 +33,8 @@ const Admin = () => {
   const [showTimerDialog, setShowTimerDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [customMacAddress, setCustomMacAddress] = useState("");
+  const [useDynamicMac, setUseDynamicMac] = useState(true);
 
   // Form for adding/editing employee
   const form = useForm({
@@ -39,6 +46,7 @@ const Admin = () => {
       location: "",
       bloodGroup: "",
       contactNumber: "",
+      macAddress: "",
     }
   });
 
@@ -49,9 +57,31 @@ const Admin = () => {
     }
   });
 
+  // Get vital monitoring data for selected profile
+  const vitalMonitoring = selectedProfile ? useVitalMonitoring({
+    profile: selectedProfile,
+    initialVitals: selectedProfile.currentVitals,
+    enableAlerts: true
+  }) : { vitals: null, alertLevel: AlertLevel.NORMAL, isLoading: false };
+
   useEffect(() => {
     fetchProfiles();
   }, []);
+
+  useEffect(() => {
+    // Show alert when vital signs are abnormal
+    if (vitalMonitoring.alertLevel !== AlertLevel.NORMAL && vitalMonitoring.vitals && selectedProfile) {
+      const profileName = `${selectedProfile.firstName} ${selectedProfile.lastName}`;
+      const alertType = vitalMonitoring.alertLevel === AlertLevel.DANGER ? "danger" : "warning";
+      const message = `${profileName}'s vital signs are ${alertType === "danger" ? "critically" : "borderline"} abnormal`;
+
+      toast({
+        title: alertType === "danger" ? "CRITICAL ALERT!" : "Warning",
+        description: message,
+        variant: alertType === "danger" ? "destructive" : "default",
+      });
+    }
+  }, [vitalMonitoring.alertLevel, vitalMonitoring.vitals, selectedProfile]);
 
   const fetchProfiles = async () => {
     try {
@@ -98,19 +128,33 @@ const Admin = () => {
       location: "",
       bloodGroup: "",
       contactNumber: "",
+      macAddress: "",
     });
     setSelectedPhoto(null);
+    setCustomMacAddress("");
+    setUseDynamicMac(true);
   };
 
   const handleAddProfile = async (data: any) => {
     try {
+      const macToUse = useDynamicMac ? generateMacAddress() : data.macAddress;
+      
+      if (!useDynamicMac && !macToUse) {
+        toast({
+          title: "Error",
+          description: "MAC address is required.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       const newProfile: Omit<Profile, 'id'> = {
         firstName: data.firstName,
         lastName: data.lastName,
         age: parseInt(data.age),
         gender: data.gender,
         location: data.location,
-        macAddress: generateMacAddress(),
+        macAddress: macToUse,
         status: "active",
         bloodGroup: data.bloodGroup,
         contactNumber: data.contactNumber,
@@ -350,6 +394,43 @@ const Admin = () => {
                     </div>
                     
                     <div>
+                      <div className="flex items-center mb-4">
+                        <input
+                          type="checkbox"
+                          id="useDynamicMac"
+                          checked={useDynamicMac}
+                          onChange={() => setUseDynamicMac(!useDynamicMac)}
+                          className="mr-2"
+                        />
+                        <Label htmlFor="useDynamicMac">Auto-generate MAC Address</Label>
+                      </div>
+                      
+                      {!useDynamicMac && (
+                        <FormField
+                          control={form.control}
+                          name="macAddress"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>MAC Address</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="XX:XX:XX:XX:XX:XX" 
+                                  {...field} 
+                                  value={customMacAddress}
+                                  onChange={(e) => {
+                                    setCustomMacAddress(e.target.value);
+                                    field.onChange(e.target.value);
+                                  }}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+                    </div>
+                    
+                    <div>
                       <Label htmlFor="photo">Photo</Label>
                       <div className="mt-1 flex items-center gap-4">
                         <Input 
@@ -426,7 +507,7 @@ const Admin = () => {
                   )}
                 </TabsContent>
                 
-                {/* Tabs for active and inactive profiles - keep existing code */}
+                {/* Tabs for active and inactive profiles */}
                 <TabsContent value="active" className="max-h-[600px] overflow-y-auto">
                   {activeProfiles.length > 0 ? (
                     <div className="divide-y">
@@ -566,6 +647,20 @@ const Admin = () => {
                       </p>
                     </div>
                   )}
+                  
+                  {vitalMonitoring.alertLevel !== AlertLevel.NORMAL && vitalMonitoring.vitals && (
+                    <Alert className={`mt-4 ${vitalMonitoring.alertLevel === AlertLevel.DANGER ? 'border-red-500 bg-red-50' : 'border-amber-500 bg-amber-50'}`}>
+                      <AlertTriangle className={`h-4 w-4 ${vitalMonitoring.alertLevel === AlertLevel.DANGER ? 'text-red-500' : 'text-amber-500'}`} />
+                      <AlertTitle className={vitalMonitoring.alertLevel === AlertLevel.DANGER ? 'text-red-700' : 'text-amber-700'}>
+                        {vitalMonitoring.alertLevel === AlertLevel.DANGER ? 'Critical Alert!' : 'Warning'}
+                      </AlertTitle>
+                      <AlertDescription className={vitalMonitoring.alertLevel === AlertLevel.DANGER ? 'text-red-600' : 'text-amber-600'}>
+                        {vitalMonitoring.alertLevel === AlertLevel.DANGER 
+                          ? `${selectedProfile.firstName}'s vital signs are critically abnormal and require immediate attention!` 
+                          : `${selectedProfile.firstName}'s vital signs are outside normal parameters.`}
+                      </AlertDescription>
+                    </Alert>
+                  )}
                 </div>
                 
                 {/* Vital Charts */}
@@ -631,6 +726,10 @@ const Admin = () => {
                       <TableRow>
                         <TableCell className="font-medium">Location</TableCell>
                         <TableCell>{selectedProfile.location}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-medium">MAC Address</TableCell>
+                        <TableCell><code className="bg-gray-100 px-2 py-1 rounded font-mono text-sm">{selectedProfile.macAddress}</code></TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
