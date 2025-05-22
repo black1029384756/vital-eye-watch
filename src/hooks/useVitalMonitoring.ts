@@ -21,15 +21,14 @@ export const useVitalMonitoring = ({
   initialVitals,
   enableAlerts = true
 }: UseVitalMonitoringProps): UseVitalMonitoringResult => {
-  // Initialize all hooks at the top, with consistent order
+  // Initialize states first - always in the same order
   const [vitals, setVitals] = useState<VitalReading | null>(initialVitals || null);
   const [alertLevel, setAlertLevel] = useState<AlertLevel>(AlertLevel.NORMAL);
   const [isLoading, setIsLoading] = useState<boolean>(!initialVitals);
   
-  // Store values in refs to avoid unnecessary effect dependencies
-  const profileRef = useRef<Profile>(profile);
-  const enableAlertsRef = useRef<boolean>(enableAlerts);
-  const alertLevelRef = useRef<AlertLevel>(alertLevel);
+  // Use refs to avoid recreating the effect
+  const profileRef = useRef(profile);
+  const enableAlertsRef = useRef(enableAlerts);
   
   // Update refs when props change
   useEffect(() => {
@@ -40,50 +39,51 @@ export const useVitalMonitoring = ({
     enableAlertsRef.current = enableAlerts;
   }, [enableAlerts]);
   
-  // Update alertLevel ref when state changes
+  // Main effect for subscription
   useEffect(() => {
-    alertLevelRef.current = alertLevel;
-  }, [alertLevel]);
-  
-  // Main subscription effect
-  useEffect(() => {
-    // Define a default no-op unsubscribe function
+    // Set default unsubscribe function
     let unsubscribe = () => {};
     
-    // Check if we should subscribe to vital updates
+    // Only subscribe if profile is active
     if (profileRef.current && profileRef.current.status === 'active') {
       setIsLoading(true);
       
-      // Create the subscription and store the unsubscribe function
-      const subscription = subscribeToVitalUpdates(profileRef.current.macAddress, (data) => {
-        setVitals(data);
-        setIsLoading(false);
-        
-        // Check vital signs and determine alert level
-        const level = checkVitalSigns(data);
-        
-        // Only update alert level if it has changed
-        if (level !== alertLevelRef.current) {
-          setAlertLevel(level);
+      try {
+        const subscription = subscribeToVitalUpdates(profileRef.current.macAddress, (data) => {
+          setVitals(data);
+          setIsLoading(false);
           
-          // Trigger alert if needed
-          if (enableAlertsRef.current && level !== AlertLevel.NORMAL) {
-            const profileName = `${profileRef.current.firstName} ${profileRef.current.lastName}`;
-            triggerAlert(data, profileName, level);
-          }
-        }
-      });
-      
-      unsubscribe = subscription.unsubscribe;
+          // Determine alert level
+          const level = checkVitalSigns(data);
+          
+          // Update alert level if changed
+          setAlertLevel(prevLevel => {
+            if (prevLevel !== level) {
+              // Only trigger alert if needed
+              if (enableAlertsRef.current && level !== AlertLevel.NORMAL) {
+                const profileName = `${profileRef.current.firstName} ${profileRef.current.lastName}`;
+                triggerAlert(data, profileName, level);
+              }
+              return level;
+            }
+            return prevLevel;
+          });
+        });
+        
+        unsubscribe = subscription.unsubscribe;
+      } catch (error) {
+        console.error("Error subscribing to vital updates:", error);
+        setIsLoading(false);
+      }
     } else {
       setIsLoading(false);
     }
     
-    // Return cleanup function
+    // Clean up subscription
     return () => {
       unsubscribe();
     };
-  }, [/* Empty dependency array - use refs instead */]);
+  }, []); // Empty dependency array since we use refs
   
   return {
     vitals,
