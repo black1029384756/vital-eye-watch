@@ -20,23 +20,33 @@ export const useVitalMonitoring = ({
   initialVitals,
   enableAlerts = true
 }: UseVitalMonitoringProps): UseVitalMonitoringResult => {
+  // Initialize all state hooks at the top level to maintain consistent hook order
   const [vitals, setVitals] = useState<VitalReading | null>(initialVitals || null);
   const [alertLevel, setAlertLevel] = useState<AlertLevel>(AlertLevel.NORMAL);
   const [isLoading, setIsLoading] = useState<boolean>(!initialVitals);
   
-  // Use ref to keep track of the current alertLevel to avoid dependency issues
+  // Use refs for values we need to access in callbacks without adding them as dependencies
+  const profileRef = useRef<Profile>(profile);
   const alertLevelRef = useRef<AlertLevel>(AlertLevel.NORMAL);
+  const enableAlertsRef = useRef<boolean>(enableAlerts);
   
-  // Update the ref whenever alertLevel changes
+  // Keep refs in sync with props
+  useEffect(() => {
+    profileRef.current = profile;
+    enableAlertsRef.current = enableAlerts;
+  }, [profile, enableAlerts]);
+  
+  // Keep alertLevelRef in sync with state
   useEffect(() => {
     alertLevelRef.current = alertLevel;
   }, [alertLevel]);
 
+  // Subscribe to vital updates
   useEffect(() => {
-    // If profile doesn't exist or is inactive, don't subscribe
+    // Early return if profile isn't active - but don't make it conditional
     if (!profile || profile.status !== 'active') {
       setIsLoading(false);
-      return;
+      return () => {/* Empty cleanup function */};
     }
     
     setIsLoading(true);
@@ -54,8 +64,9 @@ export const useVitalMonitoring = ({
         setAlertLevel(level);
         
         // Trigger alert if needed
-        if (enableAlerts && level !== AlertLevel.NORMAL) {
-          triggerAlert(data, `${profile.firstName} ${profile.lastName}`, level);
+        if (enableAlertsRef.current && level !== AlertLevel.NORMAL) {
+          const profileName = `${profileRef.current.firstName} ${profileRef.current.lastName}`;
+          triggerAlert(data, profileName, level);
         }
       }
     });
@@ -64,7 +75,7 @@ export const useVitalMonitoring = ({
     return () => {
       subscription.unsubscribe();
     };
-  }, [profile, enableAlerts]); // Removed alertLevel from dependencies
+  }, [profile]); // Only depend on profile identity changes
 
   return {
     vitals,
